@@ -1,18 +1,11 @@
-from fastapi import FastAPI
-
-
-app = FastAPI()
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+from app.main import app
 
 
 def main() -> None:
+    # 兼容直接运行 python main.py 的启动方式。
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8123, reload=True)
 
 
 if __name__ == "__main__":

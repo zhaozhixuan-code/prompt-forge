@@ -6,6 +6,8 @@ PromptForge 是从现有 Java 单体后端逐步重构而来的 Python 后端项
 
 当前重构策略是按模块逐步迁移，而不是一次性整体改造。每完成一个模块，都应优先通过前端真实交互验证兼容性。
 
+项目的具体设计可参考docs/python-backend-refactor-guide.md，里面包含对原java项目的解析
+
 ## 项目根目录
 
 ```text
@@ -323,6 +325,16 @@ data:
 
 第一阶段建议沿用原 MySQL 表结构，不主动改表。
 
+数据库名称：
+
+- `zzx_ai_code`
+
+数据库表设计来源：
+
+- `sql/zzx_ai_code.sql`
+
+该 SQL 文件是当前 Python 重构项目的数据库结构依据。后续创建 SQLAlchemy ORM 模型、Pydantic Schema、Repository 查询逻辑时，应优先以该文件中的表结构、字段名、索引和默认值为准。
+
 核心表：
 
 - `user`
@@ -335,6 +347,7 @@ data:
 
 - 数据库列名可继续使用原 Java 项目的驼峰字段。
 - Python 对外 JSON 字段第一阶段也保持驼峰，减少前端改动。
+- ORM 字段和数据库字段的映射要严格对齐 `sql/zzx_ai_code.sql`。
 
 ## 编码规范
 

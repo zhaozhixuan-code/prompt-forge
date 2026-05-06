@@ -423,6 +423,29 @@ vue_project_{appId}
 - 方便 Java 后端和 Python 后端对照测试。
 - 减少前端字段变更。
 
+当前数据库名称：
+
+```text
+zzx_ai_code
+```
+
+当前数据库表设计文件：
+
+```text
+sql/zzx_ai_code.sql
+```
+
+该 SQL 文件是 Python 后端 ORM 模型、Schema、Repository 和 Alembic 初始迁移的主要依据。后续实现数据库层时，应优先参考该文件中的：
+
+- 表名。
+- 字段名。
+- 字段类型。
+- 默认值。
+- 主键。
+- 唯一索引。
+- 普通索引。
+- 逻辑删除字段。
+
 需要迁移的核心表：
 
 ```text
@@ -438,6 +461,7 @@ chat_group_member
 - ORM 字段可以先保持驼峰命名，例如 `userAccount`、`createTime`。
 - JSON 响应字段也先保持驼峰命名。
 - 等前端完全稳定后，再考虑 Python 风格字段转换。
+- SQLAlchemy 模型字段应与 `sql/zzx_ai_code.sql` 保持一致，避免前端和数据库字段映射出现额外转换成本。
 
 ## 9. 按模块逐步重构计划
 
