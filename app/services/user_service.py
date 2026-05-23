@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.exceptions import BusinessException, ErrorCode, throw_if
-from app.core.security import create_user_session
+from app.core.security import create_user_session, delete_user_session
 from app.repositories.user_repository import create_user, get_user_by_account
 from app.schemas.user import UserLoginRequest, UserRegisterRequest, UserVO
 
@@ -122,3 +122,20 @@ def login_user(
         user=UserVO.model_validate(user),
         session_id=session_id,
     )
+
+
+def logout_user(redis_client: Redis, session_id: str | None) -> bool:
+    """
+    用户注销。
+
+    Args:
+        redis_client: Redis 客户端，用于删除登录 Session。
+        session_id: 当前请求 Cookie 中携带的登录 Session ID。
+
+    Returns:
+        退出登录是否成功。
+    """
+    # 和 Java 的 request.getSession().removeAttribute(...) 类似，
+    # Python 端删除 Redis Session 后，后续请求就无法再通过该 Cookie 获取登录用户。
+    delete_user_session(redis_client, session_id)
+    return True

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from redis import Redis
 from sqlalchemy.orm import Session
 
@@ -7,7 +7,7 @@ from app.core.response import BaseResponse
 from app.db.redis import get_redis_client
 from app.db.session import get_db
 from app.schemas.user import UserLoginRequest, UserRegisterRequest, UserVO
-from app.services.user_service import login_user, register_user
+from app.services.user_service import login_user, logout_user, register_user
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -67,3 +67,35 @@ def login(
         path="/",
     )
     return BaseResponse.ok(result.user)
+
+
+@router.post("/logout", response_model=BaseResponse[bool])
+def logout(
+    request: Request,
+    response: Response,
+    redis_client: Redis = Depends(get_redis_client),
+) -> BaseResponse[bool]:
+    """
+    用户注销。
+
+    Args:
+        request: HTTP 请求对象，用于读取登录 Cookie。
+        response: HTTP 响应对象，用于清理浏览器登录 Cookie。
+        redis_client: Redis 客户端，用于删除登录 Session。
+
+    Returns:
+        是否退出登录成功。
+    """
+    settings = get_settings()
+    session_id = request.cookies.get(settings.session_cookie_name)
+    result = logout_user(redis_client, session_id)
+
+    # 删除浏览器端 Cookie；Redis Session 删除后，服务端登录态也随之失效。
+    response.delete_cookie(
+        key=settings.session_cookie_name,
+        path="/",
+        secure=settings.session_cookie_secure,
+        httponly=settings.session_cookie_httponly,
+        samesite=settings.session_cookie_samesite,
+    )
+    return BaseResponse.ok(result)

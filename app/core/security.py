@@ -25,3 +25,18 @@ def create_user_session(
     # setex 同时写入值和过期时间，对应 Spring Session 中会话自动过期的行为。
     redis_client.setex(build_session_key(session_id), expire_seconds, payload)
     return session_id
+
+
+def delete_user_session(redis_client: Redis, session_id: str | None) -> None:
+    """
+    删除 Redis 中的用户登录 Session。
+
+    Args:
+        redis_client: Redis 客户端。
+        session_id: Cookie 中携带的登录 Session ID。
+    """
+    # 退出登录允许重复调用；没有 Cookie 时无需访问 Redis，直接视为已经退出。
+    if not session_id:
+        return
+
+    redis_client.delete(build_session_key(session_id))

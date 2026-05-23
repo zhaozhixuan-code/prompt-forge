@@ -2,11 +2,11 @@ import json
 from typing import Any
 
 import pytest
-from fastapi import Response
+from fastapi import Request, Response
 
-from app.api.user import login
+from app.api.user import login, logout
 from app.core.exceptions import BusinessException, ErrorCode
-from app.core.security import SESSION_KEY_PREFIX
+from app.core.security import SESSION_KEY_PREFIX, build_session_key
 from app.models.user import User
 from app.schemas.user import UserLoginRequest
 from app.services import user_service
@@ -16,9 +16,13 @@ class FakeRedis:
     # 单测只关心是否写入 Redis Session，不依赖真实 Redis 服务。
     def __init__(self) -> None:
         self.setex_calls: list[tuple[str, int, str]] = []
+        self.delete_calls: list[str] = []
 
     def setex(self, key: str, time: int, value: str) -> None:
         self.setex_calls.append((key, time, value))
+
+    def delete(self, key: str) -> None:
+        self.delete_calls.append(key)
 
 
 def _make_user(password: str) -> User:
@@ -106,3 +110,54 @@ def test_login_route_returns_user_and_sets_cookie(
     assert result.data.userAccount == "testuser"
     assert "PF_SESSION=" in response.headers["set-cookie"]
     assert len(redis_client.setex_calls) == 1
+
+
+def test_logout_user_deletes_session() -> None:
+    redis_client = FakeRedis()
+
+    result = user_service.logout_user(
+        redis_client=redis_client,  # type: ignore[arg-type]
+        session_id="session-token",
+    )
+
+    assert result is True
+    assert redis_client.delete_calls == [build_session_key("session-token")]
+
+
+def test_logout_route_deletes_session_and_clears_cookie() -> None:
+    redis_client = FakeRedis()
+    request = Request(
+        {
+            "type": "http",
+            "headers": [(b"cookie", b"PF_SESSION=session-token")],
+        }
+    )
+    response = Response()
+
+    result = logout(
+        request=request,
+        response=response,
+        redis_client=redis_client,  # type: ignore[arg-type]
+    )
+
+    assert result.code == 0
+    assert result.data is True
+    assert redis_client.delete_calls == [build_session_key("session-token")]
+    assert "PF_SESSION=" in response.headers["set-cookie"]
+    assert "Max-Age=0" in response.headers["set-cookie"]
+
+
+def test_logout_route_without_cookie_is_idempotent() -> None:
+    redis_client = FakeRedis()
+    request = Request({"type": "http", "headers": []})
+    response = Response()
+
+    result = logout(
+        request=request,
+        response=response,
+        redis_client=redis_client,  # type: ignore[arg-type]
+    )
+
+    assert result.code == 0
+    assert result.data is True
+    assert redis_client.delete_calls == []
