@@ -8,10 +8,30 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.exceptions import BusinessException, ErrorCode, throw_if
 from app.core.security import create_user_session, delete_user_session
-from app.repositories.user_repository import create_user, get_user_by_account
-from app.schemas.user import UserLoginRequest, UserRegisterRequest, UserVO
+from app.repositories.user_repository import (
+    create_admin_user,
+    create_user,
+    get_user_by_account,
+    get_user_by_id,
+    list_users_by_page,
+    soft_delete_user_by_id,
+    update_user_by_id,
+)
+from app.schemas.user import (
+    UserAddRequest,
+    UserAdminVO,
+    UserDeleteRequest,
+    UserLoginRequest,
+    UserPageVO,
+    UserQueryRequest,
+    UserRegisterRequest,
+    UserUpdateRequest,
+    UserVO,
+)
 
 SALT = "zhaozhixuan"
+DEFAULT_ADMIN_CREATE_PASSWORD = "12345678"
+USER_ROLES = {"user", "admin"}
 
 
 @dataclass(frozen=True)
@@ -139,3 +159,119 @@ def logout_user(redis_client: Redis, session_id: str | None) -> bool:
     # Python 端删除 Redis Session 后，后续请求就无法再通过该 Cookie 获取登录用户。
     delete_user_session(redis_client, session_id)
     return True
+
+
+def add_user_by_admin(db: Session, request: UserAddRequest) -> int:
+    """管理员创建用户。"""
+    user_account = request.userAccount.strip()
+    user_password = request.userPassword or DEFAULT_ADMIN_CREATE_PASSWORD
+    user_role = request.userRole.strip()
+
+    # 管理端创建也复用用户账号、密码和角色的基础约束，避免写入前端无法处理的数据。
+    throw_if(len(user_account) < 4, ErrorCode.PARAMS_ERROR, "user account is too short")
+    throw_if(len(user_password) < 8, ErrorCode.PARAMS_ERROR, "password is too short")
+    throw_if(user_role not in USER_ROLES, ErrorCode.PARAMS_ERROR, "invalid user role")
+    throw_if(
+        get_user_by_account(db, user_account) is not None,
+        ErrorCode.PARAMS_ERROR,
+        "user account already exists",
+    )
+
+    try:
+        user = create_admin_user(
+            db,
+            user_account=user_account,
+            user_password=encrypt_password(user_password),
+            user_name=request.userName,
+            user_avatar=request.userAvatar,
+            user_profile=request.userProfile,
+            user_role=user_role,
+        )
+    except IntegrityError as exc:
+        db.rollback()
+        raise BusinessException(ErrorCode.PARAMS_ERROR, "user account already exists") from exc
+
+    return user.id
+
+
+def get_user_by_admin(db: Session, user_id: int) -> UserAdminVO:
+    """管理员按 ID 获取用户详情。"""
+    throw_if(user_id <= 0, ErrorCode.PARAMS_ERROR, "invalid user id")
+    user = get_user_by_id(db, user_id)
+    throw_if(user is None, ErrorCode.NOT_FOUND_ERROR, "user not found")
+    return UserAdminVO.model_validate(user)
+
+
+def get_user_vo_by_id(db: Session, user_id: int) -> UserVO:
+    """按 ID 获取安全的用户包装类。"""
+    throw_if(user_id <= 0, ErrorCode.PARAMS_ERROR, "invalid user id")
+    user = get_user_by_id(db, user_id)
+    throw_if(user is None, ErrorCode.NOT_FOUND_ERROR, "user not found")
+    return UserVO.model_validate(user)
+
+
+def delete_user_by_admin(db: Session, request: UserDeleteRequest) -> bool:
+    """管理员逻辑删除用户。"""
+    throw_if(request.id <= 0, ErrorCode.PARAMS_ERROR, "invalid user id")
+    user = get_user_by_id(db, request.id)
+    throw_if(user is None, ErrorCode.NOT_FOUND_ERROR, "user not found")
+    soft_delete_user_by_id(db, user)
+    return True
+
+
+def update_user_by_admin(db: Session, request: UserUpdateRequest) -> bool:
+    """管理员更新用户资料。"""
+    throw_if(request.id <= 0, ErrorCode.PARAMS_ERROR, "invalid user id")
+    user = get_user_by_id(db, request.id)
+    throw_if(user is None, ErrorCode.NOT_FOUND_ERROR, "user not found")
+
+    update_values: dict[str, object] = {}
+    if request.userAccount is not None:
+        # 修改账号时需要排除当前用户自身，否则保持原账号也会被误判为重复。
+        user_account = request.userAccount.strip()
+        throw_if(len(user_account) < 4, ErrorCode.PARAMS_ERROR, "user account is too short")
+        existing_user = get_user_by_account(db, user_account)
+        throw_if(
+            existing_user is not None and existing_user.id != request.id,
+            ErrorCode.PARAMS_ERROR,
+            "user account already exists",
+        )
+        update_values["userAccount"] = user_account
+    if request.userPassword is not None:
+        # 数据库只保存加密后的密码，避免管理端更新时绕过统一加密规则。
+        throw_if(len(request.userPassword) < 8, ErrorCode.PARAMS_ERROR, "password is too short")
+        update_values["userPassword"] = encrypt_password(request.userPassword)
+    if request.userName is not None:
+        update_values["userName"] = request.userName
+    if request.userAvatar is not None:
+        update_values["userAvatar"] = request.userAvatar
+    if request.userProfile is not None:
+        update_values["userProfile"] = request.userProfile
+    if request.userRole is not None:
+        user_role = request.userRole.strip()
+        throw_if(user_role not in USER_ROLES, ErrorCode.PARAMS_ERROR, "invalid user role")
+        update_values["userRole"] = user_role
+
+    if not update_values:
+        # 空更新请求视为成功，和多数 Java 管理端接口行为保持一致。
+        return True
+
+    try:
+        update_user_by_id(db, user, update_values)
+    except IntegrityError as exc:
+        db.rollback()
+        raise BusinessException(ErrorCode.PARAMS_ERROR, "user account already exists") from exc
+    return True
+
+
+def list_user_vo_by_page(db: Session, request: UserQueryRequest) -> UserPageVO:
+    """分页获取安全的用户包装类列表。"""
+    records, total = list_users_by_page(db, request)
+    pages = (total + request.pageSize - 1) // request.pageSize
+    return UserPageVO(
+        records=[UserVO.model_validate(user) for user in records],
+        total=total,
+        size=request.pageSize,
+        current=request.current,
+        pages=pages,
+    )

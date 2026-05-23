@@ -2,12 +2,34 @@ from fastapi import APIRouter, Depends, Request, Response
 from redis import Redis
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_admin_user
 from app.core.config import get_settings
 from app.core.response import BaseResponse
 from app.db.redis import get_redis_client
 from app.db.session import get_db
-from app.schemas.user import UserLoginRequest, UserRegisterRequest, UserVO
-from app.services.user_service import login_user, logout_user, register_user
+from app.models.user import User
+from app.schemas.user import (
+    UserAddRequest,
+    UserAdminVO,
+    UserDeleteRequest,
+    UserLoginRequest,
+    UserPageVO,
+    UserQueryRequest,
+    UserRegisterRequest,
+    UserUpdateRequest,
+    UserVO,
+)
+from app.services.user_service import (
+    add_user_by_admin,
+    delete_user_by_admin,
+    get_user_by_admin,
+    get_user_vo_by_id,
+    list_user_vo_by_page,
+    login_user,
+    logout_user,
+    register_user,
+    update_user_by_admin,
+)
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -99,3 +121,73 @@ def logout(
         samesite=settings.session_cookie_samesite,
     )
     return BaseResponse.ok(result)
+
+
+@router.post("/add", response_model=BaseResponse[int])
+def add_user(
+    request: UserAddRequest,
+    db: Session = Depends(get_db),
+    current_admin_user: User = Depends(get_current_admin_user),
+) -> BaseResponse[int]:
+    """管理员创建用户。"""
+    _ = current_admin_user
+    user_id = add_user_by_admin(db, request)
+    return BaseResponse.ok(user_id)
+
+
+@router.get("/get", response_model=BaseResponse[UserAdminVO])
+def get_user(
+    id: int,
+    db: Session = Depends(get_db),
+    current_admin_user: User = Depends(get_current_admin_user),
+) -> BaseResponse[UserAdminVO]:
+    """管理员按 ID 获取用户详情。"""
+    _ = current_admin_user
+    user = get_user_by_admin(db, id)
+    return BaseResponse.ok(user)
+
+
+@router.get("/get/vo", response_model=BaseResponse[UserVO])
+def get_user_vo(
+    id: int,
+    db: Session = Depends(get_db),
+) -> BaseResponse[UserVO]:
+    """按 ID 获取用户包装类；该接口允许非管理员访问。"""
+    user = get_user_vo_by_id(db, id)
+    return BaseResponse.ok(user)
+
+
+@router.post("/delete", response_model=BaseResponse[bool])
+def delete_user(
+    request: UserDeleteRequest,
+    db: Session = Depends(get_db),
+    current_admin_user: User = Depends(get_current_admin_user),
+) -> BaseResponse[bool]:
+    """管理员按 ID 删除用户。"""
+    _ = current_admin_user
+    result = delete_user_by_admin(db, request)
+    return BaseResponse.ok(result)
+
+
+@router.post("/update", response_model=BaseResponse[bool])
+def update_user(
+    request: UserUpdateRequest,
+    db: Session = Depends(get_db),
+    current_admin_user: User = Depends(get_current_admin_user),
+) -> BaseResponse[bool]:
+    """管理员更新用户资料。"""
+    _ = current_admin_user
+    result = update_user_by_admin(db, request)
+    return BaseResponse.ok(result)
+
+
+@router.post("/list/page/vo", response_model=BaseResponse[UserPageVO])
+def list_user_vo(
+    request: UserQueryRequest,
+    db: Session = Depends(get_db),
+    current_admin_user: User = Depends(get_current_admin_user),
+) -> BaseResponse[UserPageVO]:
+    """管理员分页获取用户包装类列表。"""
+    _ = current_admin_user
+    page = list_user_vo_by_page(db, request)
+    return BaseResponse.ok(page)

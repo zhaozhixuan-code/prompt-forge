@@ -1,5 +1,6 @@
 import json
 import secrets
+from typing import Any
 
 from redis import Redis
 
@@ -25,6 +26,28 @@ def create_user_session(
     # setex 同时写入值和过期时间，对应 Spring Session 中会话自动过期的行为。
     redis_client.setex(build_session_key(session_id), expire_seconds, payload)
     return session_id
+
+
+def get_user_id_from_session(redis_client: Redis, session_id: str | None) -> int | None:
+    """从 Redis Session 中读取当前登录用户 ID。"""
+    # 没有 Cookie 或 Redis 中不存在对应 key，都按未登录处理。
+    if not session_id:
+        return None
+
+    payload = redis_client.get(build_session_key(session_id))
+    if payload is None:
+        return None
+    if isinstance(payload, bytes):
+        payload = payload.decode("utf-8")
+
+    try:
+        session_data: Any = json.loads(payload)
+    except (TypeError, json.JSONDecodeError):
+        # Session 内容异常时不抛系统错误，按登录态失效处理更符合前端预期。
+        return None
+
+    user_id = session_data.get("userId") if isinstance(session_data, dict) else None
+    return user_id if isinstance(user_id, int) else None
 
 
 def delete_user_session(redis_client: Redis, session_id: str | None) -> None:
