@@ -22,12 +22,34 @@ class UserLoginResult:
 
 
 def encrypt_password(password: str) -> str:
+    """
+    加密用户密码。
+
+    Args:
+        password: 用户提交的明文密码。
+
+    Returns:
+        兼容原 Java 后端的 MD5 加密密码。
+    """
     # 兼容原 Java 后端 getEncryptPassword：md5(SALT + userPassword)。
     # 后续如切换 bcrypt，需要兼顾旧用户密码迁移。
     return hashlib.md5(f"{SALT}{password}".encode("utf-8")).hexdigest()
 
 
 def register_user(db: Session, request: UserRegisterRequest) -> int:
+    """
+    用户注册。
+
+    Args:
+        db: 数据库会话，用于账号查重和创建用户。
+        request: 用户注册请求，包含账号、密码和确认密码。
+
+    Returns:
+        注册成功后的用户 ID。
+
+    Raises:
+        BusinessException: 当账号格式不合法、密码不合法、两次密码不一致或账号已存在时抛出。
+    """
     # 统一在业务层处理注册校验，避免路由层掺入业务规则。
     user_account = request.userAccount.strip()
     user_password = request.userPassword
@@ -57,6 +79,20 @@ def login_user(
     redis_client: Redis,
     request: UserLoginRequest,
 ) -> UserLoginResult:
+    """
+    用户登录。
+
+    Args:
+        db: 数据库会话，用于按账号查询用户。
+        redis_client: Redis 客户端，用于写入登录 Session。
+        request: 用户登录请求，包含账号和密码。
+
+    Returns:
+        登录用户信息和需要写入 Cookie 的 session_id。
+
+    Raises:
+        BusinessException: 当账号密码格式不合法、用户不存在或密码错误时抛出。
+    """
     # 账号允许前后有空格，进入业务逻辑前统一裁剪，和注册逻辑保持一致。
     user_account = request.userAccount.strip()
     user_password = request.userPassword
