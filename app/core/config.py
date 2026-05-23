@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     redis_db: int = 0
     redis_decode_responses: bool = True
 
+    # Python 端使用自定义 Redis Session；这些配置控制浏览器 Cookie 行为和 Session TTL。
+    session_cookie_name: str = "PF_SESSION"
+    session_expire_seconds: int = 60 * 60 * 24 * 30
+    session_cookie_httponly: bool = True
+    session_cookie_secure: bool = False
+    session_cookie_samesite: str = "lax"
+
     @computed_field
     @property
     def database_url(self) -> str:

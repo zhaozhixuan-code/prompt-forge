@@ -8,6 +8,12 @@ class UserRegisterRequest(BaseModel):
     checkPassword: str = Field(min_length=1)
 
 
+class UserLoginRequest(BaseModel):
+    # 登录接口字段名保持驼峰，兼容现有前端和原 Java DTO。
+    userAccount: str = Field(min_length=1)
+    userPassword: str = Field(min_length=1)
+
+
 class UserVO(BaseModel):
     # from_attributes 允许直接把 SQLAlchemy User 对象转换为响应 VO。
     model_config = ConfigDict(from_attributes=True)
