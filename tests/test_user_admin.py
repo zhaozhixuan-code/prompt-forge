@@ -39,7 +39,11 @@ def test_add_user_by_admin_uses_default_password(
 
     user_id = user_service.add_user_by_admin(
         db=object(),
-        request=UserAddRequest(userAccount=" adminuser ", userRole="admin"),
+        request=UserAddRequest(
+            userAccount=" adminuser ",
+            userPassword="requestpass123",
+            userRole="admin",
+        ),
     )
 
     assert user_id == 2
@@ -84,17 +88,26 @@ def test_list_user_vo_by_page_returns_page_shape(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     users = [_make_user(user_id=1), _make_user(user_id=2, user_account="otheruser")]
-    monkeypatch.setattr(user_service, "list_users_by_page", lambda db, request: (users, 12))
+
+    def fake_list_users_by_page(db: Any, request: UserQueryRequest):
+        assert request.current == 2
+        assert request.pageSize == 5
+        return users, 12
+
+    monkeypatch.setattr(user_service, "list_users_by_page", fake_list_users_by_page)
 
     page = user_service.list_user_vo_by_page(
         db=object(),
-        request=UserQueryRequest(current=2, pageSize=5),
+        request=UserQueryRequest(pageNum=2, pageSize=5),
     )
 
     assert page.total == 12
     assert page.current == 2
     assert page.size == 5
     assert page.pages == 3
+    assert page.pageNum == 2
+    assert page.pageSize == 5
+    assert page.totalRow == 12
     assert [record.id for record in page.records] == [1, 2]
 
 

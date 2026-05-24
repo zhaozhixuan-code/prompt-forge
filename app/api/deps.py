@@ -16,7 +16,20 @@ def get_current_user(
     db: Session = Depends(get_db),
     redis_client: Redis = Depends(get_redis_client),
 ) -> User:
-    """从 Cookie Session 中解析当前登录用户。"""
+    """
+    获取当前登录用户。
+
+    Args:
+        request: HTTP 请求对象，用于读取登录 Cookie。
+        db: 数据库会话，用于查询用户信息。
+        redis_client: Redis 客户端，用于读取登录 Session。
+
+    Returns:
+        当前登录用户。
+
+    Raises:
+        BusinessException: 当 Cookie 缺失、Session 失效或用户不存在时抛出。
+    """
     settings = get_settings()
     session_id = request.cookies.get(settings.session_cookie_name)
     user_id = get_user_id_from_session(redis_client, session_id)
@@ -33,7 +46,48 @@ def get_current_user(
 def get_current_admin_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """校验当前登录用户是否为管理员。"""
+    """
+    获取当前登录管理员用户。
+
+    Args:
+        current_user: 已通过登录态校验的当前用户。
+
+    Returns:
+        当前登录管理员用户。
+
+    Raises:
+        BusinessException: 当当前用户不是管理员时抛出。
+    """
     if current_user.userRole != "admin":
         raise BusinessException(ErrorCode.NO_AUTH_ERROR)
     return current_user
+
+
+def require_login(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    要求接口调用方已登录。
+
+    Args:
+        current_user: 当前登录用户。
+
+    Returns:
+        当前登录用户。
+    """
+    return current_user
+
+
+def require_admin(
+    current_admin_user: User = Depends(get_current_admin_user),
+) -> User:
+    """
+    要求接口调用方为管理员。
+
+    Args:
+        current_admin_user: 当前登录管理员用户。
+
+    Returns:
+        当前登录管理员用户。
+    """
+    return current_admin_user

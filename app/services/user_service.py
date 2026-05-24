@@ -164,7 +164,8 @@ def logout_user(redis_client: Redis, session_id: str | None) -> bool:
 def add_user_by_admin(db: Session, request: UserAddRequest) -> int:
     """管理员创建用户。"""
     user_account = request.userAccount.strip()
-    user_password = request.userPassword or DEFAULT_ADMIN_CREATE_PASSWORD
+    # 对齐 Java Controller：管理员创建用户时固定使用默认密码，忽略请求体里的 userPassword。
+    user_password = DEFAULT_ADMIN_CREATE_PASSWORD
     user_role = request.userRole.strip()
 
     # 管理端创建也复用用户账号、密码和角色的基础约束，避免写入前端无法处理的数据。
@@ -274,4 +275,7 @@ def list_user_vo_by_page(db: Session, request: UserQueryRequest) -> UserPageVO:
         size=request.pageSize,
         current=request.current,
         pages=pages,
+        pageNum=request.current,
+        pageSize=request.pageSize,
+        totalRow=total,
     )

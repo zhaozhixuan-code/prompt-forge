@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class UserRegisterRequest(BaseModel):
@@ -43,14 +43,22 @@ class UserDeleteRequest(BaseModel):
 
 
 class UserQueryRequest(BaseModel):
-    # 管理端分页查询参数；current/pageSize 命名保持和前端分页组件一致。
+    # 管理端分页查询参数；兼容 Java 端 pageNum/pageSize 和常见前端 current/pageSize。
     current: int = Field(default=1, ge=1)
+    pageNum: int | None = Field(default=None, ge=1)
     pageSize: int = Field(default=10, ge=1, le=100)
     id: int | None = None
     userAccount: str | None = None
     userName: str | None = None
     userProfile: str | None = None
     userRole: str | None = None
+
+    @model_validator(mode="after")
+    def sync_java_page_num(self) -> "UserQueryRequest":
+        # 原 Java DTO 使用 pageNum；如果前端传 pageNum，查询逻辑统一同步到 current。
+        if self.pageNum is not None:
+            self.current = self.pageNum
+        return self
 
 
 class UserVO(BaseModel):
@@ -72,9 +80,12 @@ class UserAdminVO(UserVO):
 
 
 class UserPageVO(BaseModel):
-    # 兼容 MyBatis-Plus Page 常见响应字段，方便现有前端直接消费。
+    # 同时返回 Python 当前字段和 Java Page 常见字段，减少前端分页适配成本。
     records: list[UserVO]
     total: int
     size: int
     current: int
     pages: int
+    pageNum: int
+    pageSize: int
+    totalRow: int

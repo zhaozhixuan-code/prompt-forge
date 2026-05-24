@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from redis import Redis
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_admin_user
+from app.api.deps import get_current_admin_user, require_login
 from app.core.config import get_settings
 from app.core.response import BaseResponse
 from app.db.redis import get_redis_client
@@ -121,6 +121,22 @@ def logout(
         samesite=settings.session_cookie_samesite,
     )
     return BaseResponse.ok(result)
+
+
+@router.get("/get/login", response_model=BaseResponse[UserVO])
+def get_login_user(
+    current_user: User = Depends(require_login),
+) -> BaseResponse[UserVO]:
+    """
+    获取当前登录用户。
+
+    Args:
+        current_user: 已通过登录态校验的当前用户。
+
+    Returns:
+        当前登录用户信息。
+    """
+    return BaseResponse.ok(UserVO.model_validate(current_user))
 
 
 @router.post("/add", response_model=BaseResponse[int])
