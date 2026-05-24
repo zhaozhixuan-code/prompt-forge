@@ -5,7 +5,7 @@ import pytest
 from app.api.deps import get_current_admin_user
 from app.core.exceptions import BusinessException, ErrorCode
 from app.models.user import User
-from app.schemas.user import UserAddRequest, UserQueryRequest, UserUpdateRequest
+from app.schemas.user import UserAddRequest, UserQueryRequest, UserUpdateRequest, UserVO
 from app.services import user_service
 
 
@@ -109,6 +109,14 @@ def test_list_user_vo_by_page_returns_page_shape(
     assert page.pageSize == 5
     assert page.totalRow == 12
     assert [record.id for record in page.records] == [1, 2]
+
+
+def test_user_vo_serializes_bigint_id_as_string() -> None:
+    bigint_id = 1991139811048484869
+    user_vo = UserVO.model_validate(_make_user(user_id=bigint_id))
+
+    assert user_vo.id == bigint_id
+    assert user_vo.model_dump(mode="json")["id"] == str(bigint_id)
 
 
 def test_get_current_admin_user_rejects_normal_user() -> None:

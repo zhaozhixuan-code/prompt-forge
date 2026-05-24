@@ -34,11 +34,11 @@ from app.services.user_service import (
 router = APIRouter(prefix="/user", tags=["user"])
 
 
-@router.post("/register", response_model=BaseResponse[int])
+@router.post("/register", response_model=BaseResponse[str])
 def register(
     request: UserRegisterRequest,
     db: Session = Depends(get_db),
-) -> BaseResponse[int]:
+) -> BaseResponse[str]:
     """
     用户注册。
 
@@ -51,7 +51,7 @@ def register(
     """
     # 路由层只负责参数接收、依赖注入和统一响应包装，注册规则放到 service 层。
     user_id = register_user(db, request)
-    return BaseResponse.ok(user_id)
+    return BaseResponse.ok(str(user_id))
 
 
 @router.post("/login", response_model=BaseResponse[UserVO])
@@ -139,16 +139,16 @@ def get_login_user(
     return BaseResponse.ok(UserVO.model_validate(current_user))
 
 
-@router.post("/add", response_model=BaseResponse[int])
+@router.post("/add", response_model=BaseResponse[str])
 def add_user(
     request: UserAddRequest,
     db: Session = Depends(get_db),
     current_admin_user: User = Depends(get_current_admin_user),
-) -> BaseResponse[int]:
+) -> BaseResponse[str]:
     """管理员创建用户。"""
     _ = current_admin_user
     user_id = add_user_by_admin(db, request)
-    return BaseResponse.ok(user_id)
+    return BaseResponse.ok(str(user_id))
 
 
 @router.get("/get", response_model=BaseResponse[UserAdminVO])

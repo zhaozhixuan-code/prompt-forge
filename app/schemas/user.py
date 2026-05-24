@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 
 class UserRegisterRequest(BaseModel):
@@ -72,6 +72,11 @@ class UserVO(BaseModel):
     userProfile: str | None = None
     userRole: str
     createTime: datetime | None = None
+
+    @field_serializer("id")
+    def serialize_id(self, value: int) -> str:
+        # MySQL bigint 可能超过 JavaScript 安全整数范围，对外统一序列化为字符串。
+        return str(value)
 
 
 class UserAdminVO(UserVO):
