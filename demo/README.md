@@ -18,6 +18,7 @@ uv run python -m demo.lesson02_structured_output
 uv run python -m demo.lesson03_streaming
 uv run python -m demo.lesson04_tools
 uv run python -m demo.lesson05_langgraph
+uv run python -m demo.lesson06_agents
 ```
 
 运行前需要在 `.env` 中配置 `AI_API_KEY`、`AI_BASE_URL` 和 `AI_MODEL`，模型配置会复用项目里的 `app.core.config.Settings`。
