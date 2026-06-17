@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.ai.routing_service import route_code_gen_type
 from app.core.exceptions import ErrorCode, throw_if
 from app.models.app import App
 from app.models.user import User
@@ -25,7 +26,6 @@ from app.schemas.app import (
 )
 from app.schemas.user import UserVO
 
-DEFAULT_CODE_GEN_TYPE = "html"
 MAX_USER_PAGE_SIZE = 20
 
 
@@ -70,16 +70,21 @@ def _build_app_page_vo(db: Session, records: list[App], total: int, request: App
 
 
 def add_app_by_user(db: Session, request: AppAddRequest, current_user: User) -> int:
-    """登录用户创建应用。"""
+    """登录用户创建应用。
+
+    先校验初始 prompt，再交给 AI 路由判断生成类型。
+    路由结果会随应用一起写入 code_gen_type，后续生成链路直接按这个类型执行。
+    """
     init_prompt = request.initPrompt.strip()
     throw_if(not init_prompt, ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空")
 
+    # 创建时就确定生成模式，避免后续生成阶段再去猜测用户意图。
     app = create_app(
         db,
         app_name=_build_default_app_name(init_prompt),
         init_prompt=init_prompt,
-        # AI 类型路由在后续阶段迁移，当前先使用 HTML 模式保证应用链路可用。
-        code_gen_type=DEFAULT_CODE_GEN_TYPE,
+        # 这里不再写死 html，而是由智能路由决定应用的生成类型。
+        code_gen_type=route_code_gen_type(init_prompt).codeGenType,
         user_id=current_user.id,
     )
     return app.id

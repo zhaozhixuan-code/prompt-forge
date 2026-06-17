@@ -410,8 +410,7 @@ vue_project_{appId}
 注意：
 
 - Java 后端多文件类型是 `multi-file`。
-- 前端可能使用 `multi_file`。
-- Python 后端需要保留转换逻辑。
+- Python 后端统一使用 `multi-file`，不再使用 `multi_file`。
 
 ## 8. 数据库设计
 
@@ -683,9 +682,13 @@ REDIS_URL=redis://:password@localhost:6379/0
 SESSION_COOKIE_NAME=PF_SESSION
 SESSION_EXPIRE_SECONDS=2592000
 
-OPENAI_BASE_URL=https://api.deepseek.com
-OPENAI_API_KEY=replace-me
-OPENAI_MODEL_NAME=deepseek-chat
+AI_BASE_URL=https://api.deepseek.com
+AI_API_KEY=replace-me
+AI_MODEL=deepseek-chat
+AI_ROUTING_TEMPERATURE=0
+AI_ROUTING_MAX_ATTEMPTS=3
+AI_REQUEST_TIMEOUT_SECONDS=30
+AI_MAX_RETRIES=0
 
 CODE_OUTPUT_ROOT_DIR=tmp/code_output
 CODE_DEPLOY_ROOT_DIR=tmp/deploy
@@ -797,7 +800,7 @@ AI 工具调用写文件时，必须限制在生成目录内，不能覆盖项�
 
 ### 17.4 多文件枚举风险
 
-后端可能使用 `multi-file`，前端可能使用 `multi_file`。Python 后端需要兼容这两种形式。
+Python 后端统一使用 `multi-file`，前端也应使用 `multi-file`，避免同一生成类型出现多套命名。
 
 ### 17.5 Vue 构建风险
 

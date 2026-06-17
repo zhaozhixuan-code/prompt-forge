@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 
+from app.ai.routing_service import CodeGenRoutingResult
 from app.core.exceptions import BusinessException, ErrorCode
 from app.models.app import App
 from app.models.user import User
@@ -50,12 +51,14 @@ def test_add_app_by_user_sets_owner_and_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, Any] = {}
+    route_result = CodeGenRoutingResult(codeGenType="multi-file", reason="needs separate files")
 
     def fake_create_app(db: Any, **kwargs: Any) -> App:
         captured.update(kwargs)
         return _make_app(app_id=10, user_id=kwargs["user_id"])
 
     monkeypatch.setattr(app_service, "create_app", fake_create_app)
+    monkeypatch.setattr(app_service, "route_code_gen_type", lambda prompt: route_result)
 
     app_id = app_service.add_app_by_user(
         db=object(),
@@ -67,7 +70,7 @@ def test_add_app_by_user_sets_owner_and_defaults(
     assert captured["user_id"] == 7
     assert captured["init_prompt"] == "build a landing page"
     assert captured["app_name"] == "build a land"
-    assert captured["code_gen_type"] == app_service.DEFAULT_CODE_GEN_TYPE
+    assert captured["code_gen_type"] == "multi-file"
 
 
 def test_update_app_by_user_rejects_non_owner(
